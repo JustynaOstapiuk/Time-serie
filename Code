@@ -1,0 +1,158 @@
+# wczytanie danych 
+dane = read.table("C:/Users/Justyna/Desktop/dane-projekt.txt", sep =",", header = F)
+dane
+# szereg czasowy
+dane.ts = ts(dane,start = c(1999,1),frequency = 4)
+dane.ts
+
+# wykres szeregu czasowego 
+plot(dane.ts, xlab = "Rok", ylab = "Cena 1m2 (z?)")
+
+# podzial na zbior uczacy i testowy
+dane.ucz <- window(dane.ts, end = c(2016, 4)) 
+dane.test<- window(dane.ts, start = c(2017, 1))
+start(dane.ucz)
+end(dane.ucz)
+start(dane.test)
+end(dane.test)
+length(dane.ucz)
+length(dane.test)
+
+# analiza wlasnosci szeregu czasowego 
+plot(dane.ucz, xlab = "Rok", ylab = "Cena 1m2 (z?)")
+
+library(forecast)
+
+#identyfikacja wahan sezonowych
+mon = monthplot(dane.ucz, xlab = "Kwartaly", ylab = "Cena 1m2 (zl)")
+season = seasonplot(dane.ucz, col = rainbow(18), year.labels = TRUE, xlab = "Kwarta?y", ylab = "Cena 1m2 (zl)")
+
+#identyfikacja autokorelacji
+lag.plot(dane.ucz, do.lines = FALSE, lags = 4)
+acf = Acf(dane.ucz)
+pcf = Pacf(dane.ucz)
+tsdisplay(dane.ucz)
+
+# dekompozycja 
+dane.ucz.de = decompose(dane.ucz)
+plot(dane.ucz.de, xlab = "Rok")
+
+dane.ucz.de = decompose(dane.ucz)$random
+dane.ucz.de = na.omit(dane.ucz.de)
+lag.plot(dane.ucz.de, do.lines = FALSE, lags = 4)
+tsdisplay(dane.ucz.de)
+
+# identyfikacja wartosci odstajacych
+tsoutliers(dane.ucz)
+
+# korekta kalendarzowa
+monthdays(dane.ucz)
+dane.ucz.korekta = dane.ucz*(365.25/4)/monthdays(dane.ucz)
+plot(dane.ucz)
+plot(dane.ucz.korekta)
+ts.plot(dane.ucz, dane.ucz.korekta, xlab = "Rok", ylab = "Cena 1m2 (z?)", col = c("red", "blue", lty = c(1,2)))
+legend("bottomright", c("przed korekta", "po korekcie"), col = c("red","blue"), lty = c(1,2))
+
+# roznicowanie
+dane.ucz.diff = diff(dane.ucz)
+dane.ucz.diff.diff4 = diff(dane.ucz.diff, lag=4)
+
+par(mfrow = c(3,1))
+ts.plot(dane.ucz, ylab="Szereg przed zr??nicowaniem", xlab = "Rok")
+ts.plot(dane.ucz.diff, ylab="I roznicowanie z opoznieniem o 1)", xlab = "Rok")
+ts.plot(dane.ucz.diff.diff4, ylab="II roznicowanie z opoznieniem o 4", xlab = "Rok")
+
+tsdisplay(dane.ucz.diff.diff4)
+lag.plot(dane.ucz.diff.diff4, do.lines = FALSE, lags = 4)
+
+# dekompozycja na podstawie modelu regresji 
+
+dane.ucz.tslm = tslm(dane.ucz ~ trend + season)
+dane.ucz.tslm.res = residuals(dane.ucz.tslm)
+
+par(mfrow = c(3,1))
+Acf(dane.ucz.de, main=paste("Szereg po dekompozycji klasycznej"))
+Acf(dane.ucz.diff.diff4, main=paste("Szereg po roznicowaniu"))
+Acf(dane.ucz.tslm.res, main=paste("Szereg po dekompozycji na podstawie modelu regresji"))
+
+par(mfrow = c(3,1))
+Pacf(dane.ucz.de, main=paste("Szereg po dekompozycji klasycznej"))
+Pacf(dane.ucz.diff.diff4, main=paste("Szereg po roznicowaniu"))
+Pacf(dane.ucz.tslm.res, main=paste("Szereg po dekompozycji na podstawie modelu regresji"))
+
+par(mfrow = c(1,1))
+# decompose: MA(8), AR(5)
+# roznicowanie: MA(7), AR(8)
+# tslm: MA(7), AR(8)
+
+# model MA
+model8.MA = Arima(dane.ucz, order = c(0,1,8), seasonal = c(0,1,0))
+model7.MA = Arima(dane.ucz, order = c(0,1,7), seasonal = c(0,1,0))
+
+summary(model8.MA)
+summary(model7.MA)
+
+# model AR
+
+model5.AR = Arima(dane.ucz, order = c(5,1,0), seasonal = c(0,1,1))
+model7.AR = Arima(dane.ucz, order = c(7,1,0), seasonal = c(0,1,1))
+model8.AR = Arima(dane.ucz, order = c(8,1,0), seasonal = c(0,1,1))
+
+summary(model5.AR)
+summary(model7.AR)
+summary(model8.AR)
+
+# residua dla modeli
+tsdisplay(residuals(model8.MA))
+tsdisplay(residuals(model7.MA))
+tsdisplay(residuals(model5.AR))
+tsdisplay(residuals(model7.AR))
+tsdisplay(residuals(model8.AR))
+
+# auto arima
+model_arima = auto.arima(dane.ucz)
+summary(model_arima)
+
+# reszty
+tsdisplay(residuals(model_arima))
+# prognozowanie
+model_arima_forecast <- forecast(model_arima,
+                                         h = length(dane.test))
+plot(model_arima_forecast)
+lines(dane.test, col = "red")
+
+# prognozowanie MA(8)
+model8.MA_forecast <- forecast(model8.MA,
+                                        h = length(dane.test))
+plot(model8.MA_forecast)
+lines(dane.test, col = "red")
+
+# prognozowanie MA(7)
+
+model7.MA_forecast <- forecast(model7.MA,
+                               h = length(dane.test))
+plot(model7.MA_forecast)
+lines(dane.test, col = "red")
+
+# prognozowanie AR(5)
+model5.AR_forecast <- forecast(model5.AR,
+                                           h = length(dane.test))
+plot(model5.AR_forecast)
+lines(dane.test, col = "red")
+# prognozowanie AR(7)
+model7.AR_forecast <- forecast(model7.AR,
+                               h = length(dane.test))
+plot(model7.AR_forecast)
+lines(dane.test, col = "red")
+# prognozowanie AR(8)
+model8.AR_forecast <- forecast(model8.AR,
+                               h = length(dane.test))
+plot(model8.AR_forecast)
+lines(dane.test, col = "red")
+
+# prognozowanie MA(8) - na lata 2017 - 2025
+model8.MA_forecast <- forecast(model8.MA, h = 36)
+plot(model8.MA_forecast)
+lines(dane.test, col = "red")
+
+
