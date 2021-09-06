@@ -1,1 +1,1 @@
-# Time-serie
+# Time series
